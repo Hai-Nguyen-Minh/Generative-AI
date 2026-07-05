@@ -4,3 +4,6 @@ core/dataset/CodeRM_UnitTest (test).csv
 *.csv
 # Ignore the fine-tuning output directory
 finetune_output/*.jsonl
+
+.idea
+.venv
