@@ -1,13 +1,13 @@
 {
     "llm": {
         "provider": "ollama",
-        "model": "deepseek-coder-6.7b",
+        "model": "deepseek-coder:6.7b",
         "temperature": 0.3,
         "available_models": [
             {
-                "id": "deepseek-coder-6.7b-instruct",
-                "name": "Deepseek Coder v2 16B",
-                "pull_cmd": "ollama pull deepseek-coder-6.7b"
+                "id": "deepseek-coder:6.7b",
+                "name": "Deepseek Coder 6.7B",
+                "pull_cmd": "ollama pull deepseek-coder:6.7b"
             }
         ]
     },

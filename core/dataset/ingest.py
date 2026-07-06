@@ -33,6 +33,17 @@ import sys
 from pathlib import Path
 from typing import Any, Iterator
 
+import chromadb
+from langchain_core.documents import Document
+
+try:
+    from ..config import get_config
+except ImportError:
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parents[2]))
+    from core.config import get_config
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -164,6 +175,79 @@ def save_jsonl(samples: list[dict[str, Any]], out_path: Path) -> None:
         for s in samples:
             fh.write(json.dumps(s, ensure_ascii=False) + "\n")
     logger.info("Saved %d records → %s", len(samples), out_path)
+
+
+def save_to_chromadb(samples: list[dict[str, Any]], collection_name: str) -> None:
+    """
+    Store training samples in ChromaDB for vector search and retrieval.
+    
+    Converts each sample into a LangChain Document where:
+    - page_content: concatenation of user and assistant messages
+    - metadata: task_id, split, and full messages
+    """
+    config = get_config()
+    chroma_dir = config["vectorstore"]["chroma_dir"]
+    
+    docs: list[Document] = []
+    for sample in samples:
+        task_id = sample.get("task_id", "unknown")
+        split = sample.get("split", "unknown")
+        messages = sample.get("messages", [])
+        
+        # Extract user and assistant content for the document
+        user_content = ""
+        assistant_content = ""
+        for msg in messages:
+            if msg.get("role") == "user":
+                user_content = msg.get("content", "")
+            elif msg.get("role") == "assistant":
+                assistant_content = msg.get("content", "")
+        
+        # Combine content for semantic search
+        page_content = f"User Query:\n{user_content}\n\nExpected Output:\n{assistant_content}"
+        
+        doc = Document(
+            page_content=page_content,
+            metadata={
+                "task_id": task_id,
+                "split": split,
+                "messages": json.dumps(messages, ensure_ascii=False),
+            }
+        )
+        docs.append(doc)
+    
+    # Store documents in ChromaDB
+    if not docs:
+        logger.warning("No samples to store in ChromaDB")
+        return
+    
+    try:
+        client = chromadb.PersistentClient(path=chroma_dir)
+        # Delete existing collection if present
+        try:
+            client.delete_collection(collection_name)
+            logger.info("Deleted existing ChromaDB collection: %s", collection_name)
+        except Exception:
+            pass  # Collection didn't exist — that's fine
+        
+        # Create new collection
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"}
+        )
+        
+        # Add documents with IDs
+        for idx, doc in enumerate(docs):
+            collection.add(
+                ids=[f"{collection_name}_doc_{idx}"],
+                documents=[doc.page_content],
+                metadatas=[doc.metadata],
+            )
+        
+        logger.info("Stored %d samples in ChromaDB collection '%s'", len(docs), collection_name)
+    except Exception as e:
+        logger.error("Failed to store samples in ChromaDB: %s", e)
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +613,8 @@ def main(argv: list[str] | None = None) -> None:
         val_samples   = build_samples(Path(args.val_csv),   max_rows=args.max_rows)
         save_jsonl(train_samples, output_dir / "train.jsonl")
         save_jsonl(val_samples,   output_dir / "val.jsonl")
+        save_to_chromadb(train_samples, "training_samples")
+        save_to_chromadb(val_samples, "validation_samples")
         logger.info("Ingest complete. Files written to: %s", output_dir)
 
     elif args.command == "train":
@@ -539,6 +625,8 @@ def main(argv: list[str] | None = None) -> None:
         val_samples   = build_samples(Path(args.val_csv),   max_rows=args.max_rows)
         save_jsonl(train_samples, train_jsonl)
         save_jsonl(val_samples,   val_jsonl)
+        save_to_chromadb(train_samples, "training_samples")
+        save_to_chromadb(val_samples, "validation_samples")
 
         finetune(
             base_model=args.base_model,
@@ -567,6 +655,7 @@ def main(argv: list[str] | None = None) -> None:
         if not val_jsonl.exists():
             val_samples = build_samples(Path(args.val_csv), max_rows=args.max_rows)
             save_jsonl(val_samples, val_jsonl)
+            save_to_chromadb(val_samples, "validation_samples")
 
         evaluate_only(
             adapter_path=args.adapter_path,

@@ -8,3 +8,17 @@ finetune_output/*.jsonl
 .idea/
 .venv/
 .idea/
+core/runner/__pycache__/
+core/__pycache__/
+ui/__pycache__/
+__pycache__/
+*.pyc
+node_modules/
+core/runner/js_env/
+core/runner/dotnet_env/
+core/runner/java_env/
+core/runner/cs_env/
+core/runner/py_env/
+core/runner/ts_env/
+core/runner/runtimes/
+chroma_db/
