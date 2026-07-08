@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Dict, Optional
 import logging
 
-from core.runner.base_runner import BaseRunner, RunResult
-from core.runner.bootstrap import get_runtime_dir, download_file, extract_zip
+from base_runner import BaseRunner, RunResult
+from bootstrap import get_runtime_dir, download_file, extract_zip
 
 logger = logging.getLogger(__name__)
 

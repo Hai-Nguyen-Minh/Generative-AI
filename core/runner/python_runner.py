@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict
 import logging
 
-from core.runner.base_runner import BaseRunner, RunResult
+from base_runner import BaseRunner, RunResult
 
 logger = logging.getLogger(__name__)
 

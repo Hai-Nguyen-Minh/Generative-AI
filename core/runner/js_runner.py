@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Dict
 import logging
 
-from core.runner.base_runner import BaseRunner, RunResult
-from core.runner.bootstrap import get_runtime_dir
+from base_runner import BaseRunner, RunResult
+from bootstrap import get_runtime_dir
 
 logger = logging.getLogger(__name__)
 
