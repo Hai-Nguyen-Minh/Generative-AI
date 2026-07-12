@@ -1,6 +1,5 @@
-# Ignore all CSV files in the core/dataset directory
-core/dataset/CodeRM_UnitTest.csv
-core/dataset/CodeRM_UnitTest (test).csv
+# Ignore all large CSV dataset files (over GitHub 100MB limit)
+core/dataset/**/*.csv
 
 # Ignore the fine-tuning output directory
 finetune_output/*.jsonl
