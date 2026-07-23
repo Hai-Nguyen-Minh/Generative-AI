@@ -144,3 +144,74 @@ Failed-only mode của benchmark chính không tự chain RAG để tránh mở 
 docker compose -f docker-compose.yml exec utcoder python core/benchmark/plot_eval_results.py
 ```
 Reporter chính tạo các hình/bảng so sánh model. Khi workbench RAG đủ 40 dòng ghép cặp, runner tự sinh `core/benchmark/rag_ablation/rag_ablation_table.tex` và file CSV tóm tắt đi kèm.
+
+---
+
+## 📊 7. Báo cáo Kết quả Benchmark & RAG Ablation
+
+### 🏆 7.1. Benchmark Chính — 50 Unseen Tasks
+
+#### Kết quả tổng quan
+
+| Chỉ số | `qwen2.5-coder:7b` | `llama3.1:8b` |
+| :--- | :---: | :---: |
+| ✅ Tỷ lệ Compile & Collect thành công | 94% | 92% |
+| 🎯 Pass ngay lần đầu (Pass@1) | **84%** | 58% |
+| 🏁 Pass cuối cùng sau Reflection (Pass@3) | **88%** | 78% |
+| 📏 Line Coverage | **94.5%** | 86.1% |
+| 🌿 Branch Coverage | **91.2%** | 79.8% |
+| 💥 Mutation Score (Bắt lỗi) | **83.3%** | 62.5% |
+| 🏅 **Final Score (Tổng)** | **82.1 / 100** | 65.6 / 100 |
+| ⏱️ Thời gian sinh test (trung bình) | ~164s | ~186s |
+
+#### Phân bổ chất lượng (Quality Band)
+
+| Hạng | `qwen2.5-coder:7b` | `llama3.1:8b` |
+| :--- | :---: | :---: |
+| 🥇 EXCELLENT | **33/50** | 17/50 |
+| 👍 GOOD | 9/50 | 12/50 |
+| ⚠️ FAIR | 2/50 | 10/50 |
+| 💔 WEAK | 3/50 | 7/50 |
+| ❌ INVALID | 3/50 | 4/50 |
+
+> [!TIP]
+> **Nhận xét:** Qwen2.5-Coder:7b vượt trội ở mọi chỉ số. Đáng chú ý là 84% Pass ngay lần đầu (Pass@1) nhờ Behavioral Probing. Llama 3.1 cần nhiều Reflection hơn (nhiều task cần đến lần 2–4) và Mutation Score thấp hơn đáng kể (~62%), chứng tỏ nó hay "viết test cho có" mà không thực sự bắt được lỗi logic.
+
+#### Các bài chưa Pass (EventualAccepted = False)
+
+Có **6 task** khó Pass chung cho cả 2 model, đây là điểm mù hệ thống:
+
+| Task | Nguyên nhân | Cả Qwen & Llama fail? |
+| :--- | :--- | :---: |
+| `unseen_25` (`load_threshold`) | Hàm đọc file thật → Sandbox block → UNSTABLE | ✅ Cả 2 |
+| `unseen_26` (`fetch_active_user`) | Cần mock `db.fetch_one()` phức tạp → hay bị sai protocol | ✅ Cả 2 |
+| `unseen_14` (`lru_cache_sim`) | State phức tạp, LRU eviction logic khó kiểm tra | ✅ Cả 2 |
+| `unseen_30` (`SlidingWindowLimiter`) | OOP stateful + time-based → Qwen fail, Llama pass | Chỉ Qwen |
+| `unseen_35`, `unseen_37` | Llama gặp vòng lặp token vô hạn (đã fix bằng `num_predict=3000`) | Chỉ Llama |
+
+---
+
+### 🧠 7.2. RAG Ablation — 20 Project-Level Tasks
+
+#### Kết quả so sánh Bật vs Tắt RAG
+
+| Chỉ số | `RAG_OFF` | `RAG_ON` | Chênh lệch |
+| :--- | :---: | :---: | :---: |
+| 🔴 Lỗi Import Thiếu Symbol (`missing_symbol`) | **15/20** task | 8/20 task | ▼ Giảm 47% |
+| 🔴 Lỗi Protocol/Constructor sai | 1/20 task | 1/20 task | = |
+| ✅ Pass cuối cùng | 2/20 (10%) | 4/20 (20%) | ▲ Tăng 100% |
+| 🏅 **Final Score trung bình** | **8.6 / 100** | **18.1 / 100** | ▲ Tăng 110% |
+
+> [!IMPORTANT]
+> **Điều gì đang xảy ra?** RAG giúp giảm "missing_symbol errors" từ 15 xuống 8 (AI biết đúng tên hàm, class cần import từ project). Nhưng tỷ lệ Pass tổng thể ở project-level vẫn rất thấp (~20%), điều đó có nghĩa vấn đề không chỉ là thiếu import — mà còn là AI chưa hiểu được **luồng phụ thuộc phức tạp giữa các module** trong cùng một project lớn.
+
+#### Bảng 3 — Đánh giá ảnh hưởng của RAG đến tỷ lệ lỗi ngữ cảnh
+
+*Table 3. Đánh giá ảnh hưởng của RAG đến tỷ lệ lỗi ngữ cảnh.*
+
+| Cấu hình | CSR (%) | Lỗi thiếu ngữ cảnh (%) |
+| :--- | :---: | :---: |
+| **Không có RAG** | 25.0 | 75.0 |
+| **Có RAG ($k = 4$)** | **60.0** | **40.0** |
+
+*Ghi chú: CSR (Compile/Collection Success Rate) là tỷ lệ test suite sinh ra lần đầu biên dịch thành công và Pytest thu thập được.*
